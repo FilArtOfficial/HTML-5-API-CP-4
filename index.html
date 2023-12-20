@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        #dropArea {
+            width: 300px;
+            height: 150px;
+            border: 2px dashed #ccc;
+            text-align: center;
+            padding: 20px;
+            margin: 10px;
+        }
+
+        #fileInput {
+            margin-top: 10px;
+        }
+
+        #fileList {
+            margin-top: 20px;
+        }
+
+        #filterForm {
+            margin-top: 20px;
+        }
+    </style>
+    <title>Local File Storage</title>
+</head>
+<body>
+
+<div id="dropArea" ondrop="dropHandler(event)" ondragover="dragOverHandler(event)">
+    Перетащите файлы сюда или <input type="file" id="fileInput" multiple onchange="handleFiles(this.files)">
+</div>
+
+<div id="filterForm">
+    <label for="sizeFilter">Фильтр по размеру (KB):</label>
+    <input type="number" id="sizeFilter" min="0" onchange="filterFiles()">
+    
+    <label for="typeFilter">Фильтр по типу:</label>
+    <input type="text" id="typeFilter" placeholder="Введите тип файла" onchange="filterFiles()">
+</div>
+
+<div id="fileList"></div>
+
+<script>
+    function dropHandler(event) {
+        event.preventDefault();
+
+        if (event.dataTransfer.items) {
+            for (let i = 0; i < event.dataTransfer.items.length; i++) {
+                if (event.dataTransfer.items[i].kind === 'file') {
+                    const file = event.dataTransfer.items[i].getAsFile();
+                    addFileToList(file);
+                }
+            }
+        }
+    }
+
+    function dragOverHandler(event) {
+        event.preventDefault();
+    }
+
+    function handleFiles(files) {
+        for (let i = 0; i < files.length; i++) {
+            addFileToList(files[i]);
+        }
+    }
+
+    function addFileToList(file) {
+        const fileList = document.getElementById('fileList');
+        const listItem = document.createElement('div');
+        listItem.innerHTML = `<strong>${file.name}</strong> (${file.type}) - ${formatSize(file.size)}
+                              <button onclick="viewFile('${file.name}')">Просмотреть</button>`;
+        fileList.appendChild(listItem);
+        listItem.innerHTML += `<br><img src="${URL.createObjectURL(file)}" alt="${file.name}" style="max-width: 100%; max-height: 200px;">`;
+
+
+        // Сохраняем файл в localStorage
+        const filesInStorage = JSON.parse(localStorage.getItem('files')) || [];
+        filesInStorage.push({
+            name: file.name,
+            type: file.type,
+            size: file.size
+        });
+        localStorage.setItem('files', JSON.stringify(filesInStorage));
+
+        // Обновляем отображение с учетом фильтров
+        filterFiles();
+    }
+
+    function formatSize(bytes) {
+        const kb = bytes / 1024;
+        if (kb < 1024) {
+            return kb.toFixed(2) + ' KB';
+        } else {
+            const mb = kb / 1024;
+            return mb.toFixed(2) + ' MB';
+        }
+    }
+
+    function filterFiles() {
+        const sizeFilter = parseFloat(document.getElementById('sizeFilter').value) || 0;
+        const typeFilter = document.getElementById('typeFilter').value.toLowerCase();
+
+        const fileList = document.getElementById('fileList');
+        fileList.innerHTML = '';
+
+        const filesInStorage = JSON.parse(localStorage.getItem('files')) || [];
+
+        filesInStorage.forEach(file => {
+            if ((sizeFilter === 0 || file.size / 1024 <= sizeFilter) &&
+                (typeFilter === '' || file.type.toLowerCase().includes(typeFilter))) {
+                const listItem = document.createElement('div');
+                listItem.innerHTML = `<strong>${file.name}</strong> (${file.type}) - ${formatSize(file.size)}
+                                      <button onclick="viewFile('${file.name}')">Просмотреть</button>`;
+                fileList.appendChild(listItem);
+            }
+        });
+    }
+
+    function viewFile(fileName) {
+    const filesInStorage = JSON.parse(localStorage.getItem('files')) || [];
+    const selectedFile = filesInStorage.find(file => file.name === fileName);
+
+    if (selectedFile && selectedFile.type.startsWith('image/')) {
+        const imageViewer = window.open('', '_blank');
+        imageViewer.document.write(`
+            <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Image Viewer</title>
+                </head>
+                <body style="text-align: center;">
+                    <img src="${URL.createObjectURL(new Blob([selectedFile], { type: selectedFile.type }))}" alt="${selectedFile.name}" style="max-width: 100%; max-height: 100vh;">
+                </body>
+            </html>
+        `);
+    } else {
+        alert(`Файл ${fileName} не является изображением и не может быть просмотрен.`);
+    }
+}
+
+</script>
+
+</body>
+</html>
